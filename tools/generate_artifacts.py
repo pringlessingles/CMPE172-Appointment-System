@@ -61,7 +61,7 @@ class ClinicDocTemplate(BaseDocTemplate):
             rightMargin=0.68 * inch,
             topMargin=0.68 * inch,
             bottomMargin=0.58 * inch,
-            title="CMPE 172 Milestone 1 - Community Health Clinic Appointment System",
+            title="CMPE 172 Milestone 1 - Doctor Appointment System",
             author="Newton Tran",
         )
         frame = Frame(
@@ -254,7 +254,7 @@ def build_report() -> Path:
             "CoverSub", parent=s["title"], fontSize=18, leading=23, textColor=TEAL
         )),
         Spacer(1, 0.18 * inch),
-        P("Community Health Clinic Appointment System", ParagraphStyle(
+        P("Doctor Appointment System", ParagraphStyle(
             "Project", parent=s["subtitle"], fontName=BOLD, fontSize=14, leading=19, textColor=NAVY
         )),
         Spacer(1, 0.25 * inch),
@@ -280,7 +280,7 @@ def build_report() -> Path:
 
     story += [
         P("1. Proposal", s["h1"]),
-        P("The Community Health Clinic Appointment System supports a small outpatient clinic that offers primary-care and preventive-care services. Customers browse appointment availability; in later milestones they will authenticate, book, review, and cancel their own appointments. Providers publish service-specific availability and review visits assigned to them. Administrators maintain reference data and operational oversight.", s["body"]),
+        P("The Doctor Appointment System supports a medical office where patients browse appointment availability; in later milestones they will authenticate, book, review, and cancel their own appointments. Doctors publish service-specific availability and review visits assigned to them. Office administrators maintain scheduling reference data and operational oversight.", s["body"]),
         P("Technology statement", s["h2"]),
         P("The implementation uses <b>Java 17, Spring Boot, SQL, and direct JDBC through Spring JDBC</b>. It does not use JPA, Hibernate, or any other object-relational mapper.", s["callout"]),
         P("The project realizes classic enterprise standards on the modern stack: Spring Boot supplies a modern J2EE-style application container, while REST supplies distributed service boundaries analogous to CORBA/distributed objects.", s["body"]),
@@ -289,7 +289,7 @@ def build_report() -> Path:
             ["Role", "Responsibilities in the planned system"],
             ["Customer / patient", "Browse and filter slots; later log in, book, view, and cancel owned appointments."],
             ["Provider", "Publish service-specific availability; later log in and review appointments booked with them."],
-            ["Administrator", "Maintain clinic reference data and provide operational oversight."],
+            ["Administrator", "Maintain office reference data and provide operational oversight."],
         ], [1.3 * inch, 5.45 * inch], font_size=8),
         Spacer(1, 0.12 * inch),
         P("Main entities", s["h2"]),
@@ -388,7 +388,7 @@ def build_report() -> Path:
         P("The accompanying Wireframes PDF contains four labeled screens. The wireframes describe later user interaction even though Milestone 1 exposes JSON only.", s["body"]),
         table([
             ["Screen", "Purpose", "Primary elements"],
-            ["Home", "Orient the patient and begin discovery", "Clinic identity, service summary, Browse appointments action"],
+            ["Home", "Orient the patient and begin discovery", "Doctor office identity, service summary, Browse appointments action"],
             ["View available slots", "Find an appropriate appointment", "Provider/service/date filters, slot cards, pagination"],
             ["Book appointment", "Confirm the selected slot", "Read-only slot summary, patient contact fields, consent checkbox"],
             ["Confirmation", "Communicate successful booking", "Confirmation number, visit details, next actions, mock-notification status"],
@@ -531,13 +531,13 @@ def build_er_diagram() -> Path:
     path = OUT / "CMPE172_Milestone1_ER_Diagram_Newton_Tran.pdf"
     c = canvas.Canvas(str(path), pagesize=landscape(LETTER))
     width, height = landscape(LETTER)
-    c.setTitle("Community Health Clinic ER Diagram")
+    c.setTitle("Doctor Appointment System ER Diagram")
     c.setAuthor("Newton Tran")
     c.setFillColor(NAVY)
     c.rect(0, height - 0.5 * inch, width, 0.5 * inch, fill=1, stroke=0)
     c.setFillColor(WHITE)
     c.setFont(BOLD, 16)
-    c.drawString(0.45 * inch, height - 0.34 * inch, "Community Health Clinic - ER / EER Diagram")
+    c.drawString(0.45 * inch, height - 0.34 * inch, "Doctor Appointment System - ER / EER Diagram")
     c.setFont(FONT, 8)
     c.drawRightString(width - 0.45 * inch, height - 0.32 * inch, "Newton Tran | 015110368")
 
@@ -611,7 +611,7 @@ def wireframe_chrome(c, title, step, width, height):
     c.rect(0, height - 0.68 * inch, width, 0.68 * inch, fill=1, stroke=0)
     c.setFillColor(WHITE)
     c.setFont(BOLD, 14)
-    c.drawString(0.48 * inch, height - 0.43 * inch, "Community Health Clinic")
+    c.drawString(0.48 * inch, height - 0.43 * inch, "Doctor Appointment System")
     c.setFont(FONT, 8)
     c.drawRightString(width - 0.48 * inch, height - 0.40 * inch, f"Wireframe {step}/4 - {title}")
     c.setFillColor(WHITE)
@@ -648,13 +648,13 @@ def build_wireframes() -> Path:
     page = landscape(LETTER)
     width, height = page
     c = canvas.Canvas(str(path), pagesize=page)
-    c.setTitle("Community Health Clinic Wireframes")
+    c.setTitle("Doctor Appointment System Wireframes")
     c.setAuthor("Newton Tran")
 
     # 1. Home
     wireframe_chrome(c, "Home", 1, width, height)
     label(c, 0.85 * inch, 5.35 * inch, "Care that fits your schedule", 23, True, NAVY)
-    label(c, 0.86 * inch, 4.96 * inch, "Browse primary-care and preventive appointments at our community clinic.", 9, False, MUTED)
+    label(c, 0.86 * inch, 4.96 * inch, "Find an appointment with a doctor at our medical office.", 9, False, MUTED)
     button(c, 0.86 * inch, 4.25 * inch, 1.75 * inch, "Browse appointments")
     c.setFillColor(SKY)
     c.setStrokeColor(LINE)
@@ -684,8 +684,8 @@ def build_wireframes() -> Path:
     input_box(c, 5.74 * inch, 4.56 * inch, 2.0 * inch, "Date", "2026-10-05")
     button(c, 7.96 * inch, 4.56 * inch, 1.25 * inch, "Apply filters")
     for idx, (time, provider, service) in enumerate([
-        ("9:00 AM", "Dr. Maya Chen", "Primary Care Visit"),
-        ("9:20 AM", "Jordan Lee, NP", "Vaccination Consultation"),
+        ("9:00 AM", "Dr. Maya Chen", "General Consultation"),
+        ("9:20 AM", "Dr. Jordan Lee", "Vaccination Appointment"),
         ("10:00 AM", "Dr. Maya Chen", "Annual Wellness Exam"),
     ]):
         y = 3.55 * inch - idx * 0.92 * inch
@@ -708,7 +708,7 @@ def build_wireframes() -> Path:
     c.setStrokeColor(TEAL)
     c.roundRect(0.82 * inch, 3.76 * inch, 3.1 * inch, 1.22 * inch, 8, fill=1, stroke=1)
     label(c, 1.03 * inch, 4.61 * inch, "Selected visit", 8, True, TEAL)
-    label(c, 1.03 * inch, 4.30 * inch, "Primary Care Visit", 10, True, NAVY)
+    label(c, 1.03 * inch, 4.30 * inch, "General Consultation", 10, True, NAVY)
     label(c, 1.03 * inch, 4.04 * inch, "Dr. Maya Chen | Oct 5, 2026 | 9:00 AM", 7.4, False, INK)
     input_box(c, 4.42 * inch, 4.55 * inch, 2.65 * inch, "Full name", "Sofia Reyes")
     input_box(c, 7.30 * inch, 4.55 * inch, 2.65 * inch, "Email", "sofia.reyes@example.com")
@@ -741,7 +741,7 @@ def build_wireframes() -> Path:
     c.setStrokeColor(LINE)
     c.roundRect(2.76 * inch, 2.18 * inch, 5.6 * inch, 1.72 * inch, 8, fill=1, stroke=1)
     rows = [
-        ("Service", "Primary Care Visit"),
+        ("Service", "General Consultation"),
         ("Provider", "Dr. Maya Chen"),
         ("Date and time", "October 5, 2026 at 9:00 AM"),
         ("Notification", "Confirmation queued through mock service"),

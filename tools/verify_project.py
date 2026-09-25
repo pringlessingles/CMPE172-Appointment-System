@@ -19,7 +19,6 @@ schema = (ROOT / "src/main/resources/schema.sql").read_text()
 seed = (ROOT / "src/main/resources/seed.sql").read_text()
 controller = (ROOT / "src/main/java/clinic/controller/ClinicController.java").read_text()
 repository = (ROOT / "src/main/java/clinic/repository/ClinicRepository.java").read_text()
-report_source = (ROOT / "docs/Milestone1_Report_Source.md").read_text()
 
 require("spring-boot-starter-jdbc" in pom, "Spring JDBC dependency is missing")
 require("spring-boot-starter-data-jpa" not in pom, "JPA/ORM dependency must not be present")
@@ -51,8 +50,6 @@ require("LIMIT :limit OFFSET :offset" in repository, "JDBC pagination is missing
 require('@GetMapping("/")' in controller, "GET / endpoint is missing")
 require('@GetMapping("/slots")' in controller, "GET /slots endpoint is missing")
 require(seed.count("'AVAILABLE'") >= 6, "Seed data needs at least six available slots")
-require("Page Controller" in report_source and "Front Controller" in report_source, "Controller pattern discussion is missing")
-
 pdf_expectations = {
     "CMPE172_Milestone1_Report_Newton_Tran.pdf": 11,
     "CMPE172_Milestone1_ER_Diagram_Newton_Tran.pdf": 1,

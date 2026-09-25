@@ -22,7 +22,7 @@ class ClinicControllerIntegrationTest {
     void homeReadsProvidersAndServicesFromDatabase() throws Exception {
         mockMvc.perform(get("/"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.systemName").value("Community Health Clinic Appointment System"))
+                .andExpect(jsonPath("$.systemName").value("Doctor Appointment System"))
                 .andExpect(jsonPath("$.providers", hasSize(2)))
                 .andExpect(jsonPath("$.services", hasSize(4)));
     }
@@ -48,4 +48,3 @@ class ClinicControllerIntegrationTest {
                 .andExpect(jsonPath("$.message").value("size must be between 1 and 100"));
     }
 }
-

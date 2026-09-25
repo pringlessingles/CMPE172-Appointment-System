@@ -12,9 +12,9 @@
     </parent>
 
     <groupId>clinic</groupId>
-    <artifactId>community-clinic-appointments</artifactId>
+    <artifactId>doctor-appointments</artifactId>
     <version>0.0.1-SNAPSHOT</version>
-    <name>Community Clinic Appointments</name>
+    <name>Doctor Appointment System</name>
     <description>CMPE 172 Milestone 1 layered JDBC skeleton</description>
 
     <properties>

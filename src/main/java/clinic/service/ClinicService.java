@@ -22,8 +22,8 @@ public class ClinicService {
 
     public HomeDto getHome() {
         return new HomeDto(
-                "Community Health Clinic Appointment System",
-                "Find an available primary-care or wellness appointment.",
+                "Doctor Appointment System",
+                "Find an available appointment with a doctor.",
                 repository.findActiveProviders(),
                 repository.findActiveServices()
         );
@@ -52,4 +52,3 @@ public class ClinicService {
         return new SlotPageDto(items, page, size, totalItems, totalPages);
     }
 }
-
