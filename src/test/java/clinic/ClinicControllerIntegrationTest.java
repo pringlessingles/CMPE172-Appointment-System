@@ -20,7 +20,7 @@ class ClinicControllerIntegrationTest {
 
     @Test
     void homeReadsProvidersAndServicesFromDatabase() throws Exception {
-        mockMvc.perform(get("/"))
+        mockMvc.perform(get("/api/home"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.systemName").value("Doctor Appointment System"))
                 .andExpect(jsonPath("$.providers", hasSize(2)))
@@ -31,7 +31,7 @@ class ClinicControllerIntegrationTest {
     void slotsSupportsFilteringAndPagination() throws Exception {
         mockMvc.perform(get("/slots")
                         .param("providerId", "1")
-                        .param("date", "2026-10-05")
+                        .param("date", java.time.LocalDate.now().plusDays(1).toString())
                         .param("page", "0")
                         .param("size", "1"))
                 .andExpect(status().isOk())

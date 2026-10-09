@@ -1,0 +1,5 @@
+<!DOCTYPE html><html lang="en" xmlns:th="http://www.thymeleaf.org"><head th:replace="~{fragments :: head('Doctor Appointment System')}"></head><body><nav th:replace="~{fragments :: nav}"></nav><main>
+<section class="hero"><p class="eyebrow">YOUR NEXT VISIT</p><h1>Make time for your health.</h1><p>Find a doctor, choose an available time, and keep your appointments in one place.</p><a class="button" th:href="@{/available}">Find an appointment</a></section>
+<h2>Meet the doctors</h2><div class="cards"><article class="card" th:each="doctor : ${home.providers}"><h3 th:text="${doctor.name}"></h3><p th:text="${doctor.specialty}"></p><a th:href="@{/available(providerId=${doctor.id})}">View available times →</a></article></div>
+<h2>Appointment services</h2><div class="cards"><article class="card" th:each="service : ${home.services}"><h3 th:text="${service.name}"></h3><p th:text="${service.description}"></p><p><span th:text="${service.durationMinutes}"></span> minutes</p></article></div>
+</main><footer th:replace="~{fragments :: footer}"></footer></body></html>

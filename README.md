@@ -1,70 +1,91 @@
 # Doctor Appointment System
 
-CMPE 172 Milestone 1 project by **Newton Tran** (Student ID: **015110368**).
+CMPE 172 Milestones 1 and 2 project by Newton Tran.
 
-This repository contains a minimal Spring Boot application that reads doctor, service, and appointment availability data from an H2 SQL database through plain JDBC. It intentionally does not use JPA, Hibernate, or another ORM.
+Spring Boot with Thymeleaf pages, Spring Security session login, and plain JDBC SQL. No JPA or Hibernate. Patients browse, book, and cancel appointments; doctors manage their availability and view their appointments.
 
-## Requirements
+## Run on Windows
 
-- Java 17 or newer
-- Maven 3.9 or newer
+Install a JDK (Java 17 or newer). In PowerShell, from this folder:
 
-## Run the application
-
-```bash
-mvn spring-boot:run
+```powershell
+.\mvnw.cmd spring-boot:run
 ```
 
-The application starts at `http://localhost:8080`. `schema.sql` and `seed.sql` are loaded automatically on every startup.
+Open [http://localhost:8080](http://localhost:8080). The wrapper downloads Maven and dependencies on its first run, so internet access is needed initially. On macOS/Linux use `./mvnw spring-boot:run`, or use an installed Maven with `mvn spring-boot:run`.
 
-Try the required database-reading endpoints:
+## Demo accounts
 
-```bash
-curl http://localhost:8080/
-curl "http://localhost:8080/slots?page=0&size=5"
-curl "http://localhost:8080/slots?providerId=1&date=2026-10-05"
+All demo accounts use password `Appointment123!`.
+
+| Account | Email | Database role |
+| --- | --- | --- |
+| Patient | sofia.reyes@example.com | CUSTOMER |
+| Second patient | alex.morgan@example.com | CUSTOMER |
+| Doctor Maya Chen | maya.chen@doctor.example | PROVIDER |
+| Doctor Jordan Lee | jordan.lee@doctor.example | PROVIDER |
+
+Passwords in `seed.sql` are BCrypt hashes. Roles come from the database, not the submitted booking form. The seeded ADMIN account has no administrative UI in this milestone.
+
+**Demo database:** H2 runs in memory. The schema and sample data reset every startup; bookings do not survive a restart. Sample slots use tomorrow/the following days instead of a fixed date. This setup is for coursework, not real patient information. A durable deployment would need a persistent database and migrations instead of the reset script. The H2 console is disabled.
+
+## Browser flow
+
+Home -> available slots -> patient login -> booking form -> confirmation -> my appointments.
+
+- Filter available slots by doctor, service, and date. SQL applies `LIMIT` and `OFFSET`.
+- Patients can cancel only their own future, booked appointments.
+- Doctors use `/doctor` to create service-specific slots, remove available slots, and see appointments with them. Removal marks a slot BLOCKED instead of deleting appointment history.
+- Finished appointments display COMPLETED immediately; a scheduled transactional task persists that status every minute.
+- Patient-only and doctor-only routes enforce roles; authenticated users with the wrong role receive HTTP 403. POST forms include CSRF protection.
+
+## Transaction and concurrency design
+
+`BookingService.book()` uses `@Transactional(isolation = Isolation.READ_COMMITTED)`. It checks the role, selected service, active doctor/service, and future availability, then performs an atomic optimistic version update:
+
+```sql
+UPDATE availability_slots
+SET status = 'BOOKED', version = version + 1
+WHERE id = :id AND version = :version
+  AND status = 'AVAILABLE' AND starts_at > CURRENT_TIMESTAMP;
 ```
 
-The embedded H2 console is available at `http://localhost:8080/h2-console` with JDBC URL `jdbc:h2:mem:doctorappointments`, username `sa`, and a blank password. The console is enabled only for this development skeleton.
+Exactly one changed row means the claim succeeded. Zero means stale/unavailable data and returns HTTP 409. The appointment insert is in the same transaction; an insert failure rolls back the slot claim. Cancellation likewise updates the appointment and releases the slot in one transaction.
 
-## Run tests
+The database adds a second guard: `uq_appointments_slot` is unique on generated `active_slot_id`, which equals `availability_slot_id` only while the appointment is BOOKED. Cancelled/completed history has NULL there. A permanent UNIQUE on `availability_slot_id` would prevent rebooking even after cancellation, so the active-only constraint preserves history and still prevents two active bookings. Composite foreign keys ensure a slot's doctor and service match the appointment.
 
-```bash
-mvn test
+There is no automatic retry for a booking conflict: the patient must choose again after refreshing availability. Retrying stale intent automatically could book a slot after someone cancelled it. READ_COMMITTED plus the conditional write and unique constraint protects this specific race; it does not make every query serializable. H2 in-memory commits are not durable across application restarts.
+
+## Layers and core files
+
+- `security/SecurityConfig.java`: BCrypt, JDBC account lookup, session login, roles, CSRF.
+- `controller/PageController.java`: HTML pages and form handlers.
+- `controller/ClinicController.java`: public browsing JSON API.
+- `controller/BookingController.java`: protected booking and doctor JSON API.
+- `service/ClinicService.java`: filters and pagination validation.
+- `service/BookingService.java`: booking/cancellation rules and transactions.
+- `repository/ClinicRepository.java`, `BookingRepository.java`: parameterized JDBC SQL and DTO mapping.
+- `resources/schema.sql`, `seed.sql`: five entities, constraints, version column, sample accounts.
+
+Requests pass through Spring Security and DispatcherServlet to a controller, service, and repository. HTML controllers return Thymeleaf views; API controllers return JSON DTOs. DispatcherServlet remains Spring MVC's front controller in both cases.
+
+## JSON endpoints
+
+Public: `GET /api/home`, `GET /api/slots` (`/slots` remains an alias).
+
+Patient: `GET /api/appointments`, `POST /api/appointments` with `{"slotId":1,"serviceId":1}`, `POST /api/appointments/{id}/cancel`.
+
+Doctor: `GET /api/doctor/appointments`, `GET /api/doctor/slots`, `POST /api/doctor/slots` with serviceId/startsAt/endsAt, `DELETE /api/doctor/slots/{id}`.
+
+Protected APIs use the login session and require a CSRF token for mutations; they are not anonymous curl endpoints. `/` now serves the website; the old home JSON is at `/api/home`.
+
+## Verify
+
+```powershell
+.\mvnw.cmd test
+.\mvnw.cmd package
 ```
 
-The integration tests start the application, initialize the in-memory database, and verify both required endpoints and slot filtering/pagination.
+Tests cover filtering, BCrypt/session login, role and ownership checks, CSRF, browser page rendering, booking/cancellation, failed-insert rollback, active-booking uniqueness, composite foreign keys, completion, and doctor slot management. The concurrency test uses two threads and a barrier so both read the same slot version before competing to book it: exactly one must succeed.
 
-## Layered request flow
-
-1. `ClinicController` accepts HTTP requests and validates query parameters.
-2. `ClinicService` owns use-case orchestration and the pagination contract.
-3. `ClinicRepository` executes parameterized SQL with `NamedParameterJdbcTemplate`.
-4. H2 enforces keys, foreign keys, checks, and the double-booking constraint.
-5. DTO records are serialized to JSON; persistence rows never leak directly from the repository.
-
-## Project layout
-
-```text
-src/main/java/.../controller   HTTP endpoints
-src/main/java/.../service      application/use-case logic
-src/main/java/.../repository   JDBC and SQL mapping
-src/main/java/.../dto          response-only records
-src/main/resources/schema.sql  five-table relational schema
-src/main/resources/seed.sql    sample users, providers, services, slots
-src/test                       integration tests
-output/pdf                     final report, ER diagram, wireframes
-```
-
-The five-minute read-aloud code overview is maintained separately from this repository for the video submission.
-
-## Milestone scope
-
-Milestone 1 implements read-only skeleton endpoints. Authentication, booking, cancellation, doctor schedule management, notifications, observability, and AI features are documented in the proposal but intentionally deferred to later milestones.
-
-## Before submission
-
-1. Create a GitHub repository and push this folder.
-2. Record the separate five-minute code walkthrough.
-3. Add the GitHub repository URL and video URL to the submission portal.
-4. Review and personalize the report so it reflects your own understanding.
+Reports and the read-aloud video script are maintained outside this repository. The report/video/submission ZIP are separate deliverables; this repository does not claim they are completed.

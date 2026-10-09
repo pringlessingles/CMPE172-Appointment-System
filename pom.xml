@@ -15,13 +15,26 @@
     <artifactId>doctor-appointments</artifactId>
     <version>0.0.1-SNAPSHOT</version>
     <name>Doctor Appointment System</name>
-    <description>CMPE 172 Milestone 1 layered JDBC skeleton</description>
+    <description>CMPE 172 Doctor Appointment System with transactional booking</description>
 
     <properties>
         <java.version>17</java.version>
     </properties>
 
     <dependencies>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-thymeleaf</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-security</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.security</groupId>
+            <artifactId>spring-security-test</artifactId>
+            <scope>test</scope>
+        </dependency>
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-web</artifactId>

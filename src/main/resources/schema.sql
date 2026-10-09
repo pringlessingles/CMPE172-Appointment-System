@@ -33,6 +33,7 @@ CREATE TABLE services (
     price DECIMAL(10, 2) NOT NULL,
     active BOOLEAN NOT NULL DEFAULT TRUE,
     CONSTRAINT uq_services_provider_name UNIQUE (provider_id, name),
+    CONSTRAINT uq_services_id_provider UNIQUE (id, provider_id),
     CONSTRAINT fk_services_provider FOREIGN KEY (provider_id) REFERENCES providers(id),
     CONSTRAINT ck_services_duration CHECK (duration_minutes BETWEEN 10 AND 480),
     CONSTRAINT ck_services_price CHECK (price >= 0)
@@ -45,11 +46,14 @@ CREATE TABLE availability_slots (
     starts_at TIMESTAMP NOT NULL,
     ends_at TIMESTAMP NOT NULL,
     status VARCHAR(20) NOT NULL DEFAULT 'AVAILABLE',
+    version BIGINT NOT NULL DEFAULT 0,
+    CONSTRAINT uq_slots_identity UNIQUE (id, provider_id, service_id),
     CONSTRAINT uq_slots_provider_start UNIQUE (provider_id, starts_at),
     CONSTRAINT fk_slots_provider FOREIGN KEY (provider_id) REFERENCES providers(id),
     CONSTRAINT fk_slots_service FOREIGN KEY (service_id) REFERENCES services(id),
+    CONSTRAINT fk_slots_service_provider FOREIGN KEY (service_id, provider_id) REFERENCES services(id, provider_id),
     CONSTRAINT ck_slots_time CHECK (ends_at > starts_at),
-    CONSTRAINT ck_slots_status CHECK (status IN ('AVAILABLE', 'BLOCKED'))
+    CONSTRAINT ck_slots_status CHECK (status IN ('AVAILABLE', 'BOOKED', 'BLOCKED'))
 );
 
 CREATE TABLE appointments (
@@ -60,11 +64,13 @@ CREATE TABLE appointments (
     availability_slot_id BIGINT NOT NULL,
     status VARCHAR(20) NOT NULL DEFAULT 'BOOKED',
     booked_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    CONSTRAINT uq_appointments_slot UNIQUE (availability_slot_id),
+    active_slot_id BIGINT GENERATED ALWAYS AS (CASE WHEN status = 'BOOKED' THEN availability_slot_id ELSE NULL END),
+    CONSTRAINT uq_appointments_slot UNIQUE (active_slot_id),
     CONSTRAINT fk_appointments_customer FOREIGN KEY (customer_user_id) REFERENCES users(id),
     CONSTRAINT fk_appointments_provider FOREIGN KEY (provider_id) REFERENCES providers(id),
     CONSTRAINT fk_appointments_service FOREIGN KEY (service_id) REFERENCES services(id),
     CONSTRAINT fk_appointments_slot FOREIGN KEY (availability_slot_id) REFERENCES availability_slots(id),
+    CONSTRAINT fk_appointments_slot_details FOREIGN KEY (availability_slot_id, provider_id, service_id) REFERENCES availability_slots(id, provider_id, service_id),
     CONSTRAINT ck_appointments_status CHECK (status IN ('BOOKED', 'CANCELLED', 'COMPLETED'))
 );
 

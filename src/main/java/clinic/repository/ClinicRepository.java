@@ -19,6 +19,8 @@ public class ClinicRepository {
             JOIN users provider_user ON provider_user.id = provider.user_id
             JOIN services service ON service.id = slot.service_id
             WHERE slot.status = 'AVAILABLE'
+              AND slot.starts_at > CURRENT_TIMESTAMP
+              AND provider.active = TRUE AND service.active = TRUE
             """;
 
     private final NamedParameterJdbcTemplate jdbc;
@@ -79,7 +81,7 @@ public class ClinicRepository {
                        slot.starts_at,
                        slot.ends_at
                 """ + SLOT_FROM_AND_WHERE + filters + """
-                ORDER BY slot.starts_at, provider_user.full_name
+                ORDER BY slot.starts_at, provider_user.full_name, slot.id
                 LIMIT :limit OFFSET :offset
                 """, parameters, (rs, rowNum) -> new AvailabilitySlotDto(
                 rs.getLong("id"),

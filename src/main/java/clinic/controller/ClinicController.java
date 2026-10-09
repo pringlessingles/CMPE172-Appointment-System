@@ -19,12 +19,12 @@ public class ClinicController {
         this.service = service;
     }
 
-    @GetMapping("/")
+    @GetMapping("/api/home")
     public HomeDto home() {
         return service.getHome();
     }
 
-    @GetMapping("/slots")
+    @GetMapping({"/api/slots", "/slots"})
     public SlotPageDto availableSlots(
             @RequestParam(required = false) Long providerId,
             @RequestParam(required = false) Long serviceId,
@@ -36,4 +36,3 @@ public class ClinicController {
         return service.getAvailableSlots(providerId, serviceId, date, page, size);
     }
 }
-

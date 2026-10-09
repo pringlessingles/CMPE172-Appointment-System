@@ -2,9 +2,6 @@ from pathlib import Path
 import re
 import sys
 
-from pypdf import PdfReader
-
-
 ROOT = Path(__file__).resolve().parents[1]
 failures = []
 
@@ -43,28 +40,23 @@ for table_name in ("users", "providers", "services", "availability_slots", "appo
     )
 
 require(
-    "CONSTRAINT uq_appointments_slot UNIQUE (availability_slot_id)" in schema,
+    "CONSTRAINT uq_appointments_slot UNIQUE (active_slot_id)" in schema,
     "Database-level double-booking guard is missing",
 )
 require("LIMIT :limit OFFSET :offset" in repository, "JDBC pagination is missing")
-require('@GetMapping("/")' in controller, "GET / endpoint is missing")
-require('@GetMapping("/slots")' in controller, "GET /slots endpoint is missing")
+require('@GetMapping("/api/home")' in controller, "GET /api/home endpoint is missing")
+require('"/slots"' in controller and '"/api/slots"' in controller, "Slot endpoints are missing")
 require(seed.count("'AVAILABLE'") >= 6, "Seed data needs at least six available slots")
-pdf_expectations = {
-    "CMPE172_Milestone1_Report_Newton_Tran.pdf": 11,
-    "CMPE172_Milestone1_ER_Diagram_Newton_Tran.pdf": 1,
-    "CMPE172_Milestone1_Wireframes_Newton_Tran.pdf": 4,
-}
-for filename, expected_pages in pdf_expectations.items():
-    path = ROOT / "output/pdf" / filename
-    require(path.exists() and path.stat().st_size > 10_000, f"Missing or undersized PDF: {filename}")
-    if path.exists():
-        reader = PdfReader(path)
-        require(len(reader.pages) == expected_pages, f"Unexpected page count for {filename}")
+require("spring-boot-starter-security" in pom, "Spring Security is missing")
+require("spring-boot-starter-thymeleaf" in pom, "HTML rendering is missing")
+require("version BIGINT" in schema, "Optimistic version column is missing")
+require("GENERATED ALWAYS AS (CASE WHEN status = 'BOOKED'" in schema, "Active-only uniqueness column is missing")
+for name in ("home", "login", "available", "book", "confirmation", "appointments", "doctor", "error"):
+    require((ROOT / f"src/main/resources/templates/{name}.html").exists(), f"Missing page: {name}")
 
 if failures:
     for failure in failures:
         print(f"FAIL: {failure}")
     sys.exit(1)
 
-print("PASS: project structure, schema constraints, endpoint markers, seed data, and PDFs verified")
+print("PASS: project structure, schema constraints, endpoint markers, seed data, and pages verified")

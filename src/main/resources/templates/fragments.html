@@ -1,0 +1,5 @@
+<!DOCTYPE html><html lang="en" xmlns:th="http://www.thymeleaf.org"><body>
+<head th:fragment="head(title)"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title th:text="${title}">Doctor Appointment System</title><link rel="stylesheet" th:href="@{/css/site.css}"></head>
+<nav th:fragment="nav" aria-label="Main navigation"><a class="brand" th:href="@{/}">Doctor Appointment System</a><div class="navlinks"><a th:href="@{/available}">Find an appointment</a><a th:if="${account != null and account.role() == 'CUSTOMER'}" th:href="@{/my-appointments}">My appointments</a><a th:if="${account != null and account.role() == 'PROVIDER'}" th:href="@{/doctor}">Doctor dashboard</a><a th:if="${account == null}" th:href="@{/login}">Log in</a><form th:if="${account != null}" th:action="@{/logout}" method="post"><button class="secondary" type="submit">Log out</button></form></div></nav>
+<footer th:fragment="footer">CMPE 172 · Newton Tran · Demonstration appointment system. All appointment times use the server's local time.</footer>
+</body></html>

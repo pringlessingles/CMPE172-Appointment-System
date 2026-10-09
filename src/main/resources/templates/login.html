@@ -1,0 +1,5 @@
+<!DOCTYPE html><html lang="en" xmlns:th="http://www.thymeleaf.org"><head th:replace="~{fragments :: head('Log in')}"></head><body><nav th:replace="~{fragments :: nav}"></nav><main class="narrow"><h1>Welcome back.</h1><p>Log in to book a visit or manage your schedule.</p>
+<p class="notice" th:if="${param.error}">Email or password is incorrect.</p><p class="notice" th:if="${param.logout}">You have been logged out.</p>
+<form class="card stack" th:action="@{/login}" method="post"><label for="username">Email</label><input id="username" name="username" type="email" autocomplete="username" required><label for="password">Password</label><input id="password" name="password" type="password" autocomplete="current-password" required><button type="submit">Log in</button></form>
+<details><summary>Demo accounts</summary><p>Patients: sofia.reyes@example.com or alex.morgan@example.com</p><p>Doctor: maya.chen@doctor.example or jordan.lee@doctor.example</p><p>Password for demo accounts: <code>Appointment123!</code></p></details>
+</main><footer th:replace="~{fragments :: footer}"></footer></body></html>
