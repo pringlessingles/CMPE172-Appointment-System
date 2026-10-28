@@ -28,7 +28,10 @@ public class SecurityConfig {
 
     @Bean
     SecurityFilterChain security(HttpSecurity http, ObjectMapper mapper) throws Exception {
-        return http.authorizeHttpRequests(auth -> auth
+        return http.csrf(csrf -> csrf.ignoringRequestMatchers("/api/mock-notifications"))
+                .authorizeHttpRequests(auth -> auth
+                    .requestMatchers("/health", "/api/mock-notifications").permitAll()
+                    .requestMatchers("/actuator/**").hasRole("ADMIN")
                     .requestMatchers("/", "/login", "/available", "/css/**", "/error", "/api/home", "/api/slots", "/slots").permitAll()
                     .requestMatchers("/doctor/**", "/api/doctor/**").hasRole("PROVIDER")
                     .requestMatchers("/book/**", "/confirmation/**", "/my-appointments/**", "/api/appointments/**").hasRole("CUSTOMER")
@@ -52,6 +55,6 @@ public class SecurityConfig {
                                     "Forbidden", "This action is not allowed", request.getRequestURI()));
                         } else { response.sendError(403, "This action is not allowed"); }
                     }))
-                .build(); // CSRF protection stays enabled for every form and API write.
+                .build(); // Only the shared-token mock endpoint is exempt; user writes still require CSRF.
     }
 }

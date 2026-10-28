@@ -1,3 +1,5 @@
+DROP TABLE IF EXISTS notification_receipts;
+DROP TABLE IF EXISTS notification_outbox;
 DROP TABLE IF EXISTS appointments;
 DROP TABLE IF EXISTS availability_slots;
 DROP TABLE IF EXISTS services;
@@ -77,3 +79,20 @@ CREATE TABLE appointments (
 CREATE INDEX idx_slots_search ON availability_slots(status, starts_at, provider_id, service_id);
 CREATE INDEX idx_appointments_customer ON appointments(customer_user_id, booked_at);
 CREATE INDEX idx_appointments_provider ON appointments(provider_id, booked_at);
+
+CREATE TABLE notification_outbox (
+    event_id VARCHAR(36) PRIMARY KEY,
+    recipient VARCHAR(255) NOT NULL,
+    type VARCHAR(40) NOT NULL,
+    message VARCHAR(1000) NOT NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    next_attempt_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    attempts INTEGER NOT NULL DEFAULT 0,
+    delivered_at TIMESTAMP
+);
+CREATE INDEX idx_outbox_pending ON notification_outbox(delivered_at, next_attempt_at);
+CREATE TABLE notification_receipts (
+    event_id VARCHAR(36) PRIMARY KEY,
+    fingerprint VARCHAR(64) NOT NULL,
+    received_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);

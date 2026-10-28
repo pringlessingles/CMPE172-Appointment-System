@@ -5,6 +5,7 @@ import clinic.dto.SlotRecord;
 import clinic.repository.BookingRepository;
 import clinic.security.AccountPrincipal;
 import clinic.service.BookingService;
+import clinic.notification.NotificationOutbox;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.web.server.ResponseStatusException;
@@ -19,7 +20,7 @@ class BookingServiceTest {
     AccountPrincipal patient = new AccountPrincipal(3, "patient@example.com", "unused", "CUSTOMER");
     AccountPrincipal doctor = new AccountPrincipal(1, "doctor@example.com", "unused", "PROVIDER");
     LocalDateTime start = LocalDateTime.now().plusDays(2);
-    @BeforeEach void setup() { repo = mock(BookingRepository.class); service = new BookingService(repo); }
+    @BeforeEach void setup() { repo = mock(BookingRepository.class); service = new BookingService(repo, mock(NotificationOutbox.class)); }
     SlotRecord slot(String status) { return new SlotRecord(1, 1, 1, start, start.plusMinutes(30), status, 0, "Doctor", "Consultation", true, true); }
     @Test void mismatchedServiceNeverClaimsSlot() {
         when(repo.slot(1)).thenReturn(Optional.of(slot("AVAILABLE")));

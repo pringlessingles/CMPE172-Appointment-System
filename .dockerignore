@@ -1,0 +1,11 @@
+target/
+.git/
+.idea/
+.vscode/
+.env
+data/
+tmp/
+*.pdf
+*.docx
+*.mkv
+*.mp4

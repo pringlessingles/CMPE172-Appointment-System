@@ -6,3 +6,6 @@ target/
 data/
 tmp/
 tools/__pycache__/
+.env
+*.mkv
+*.mp4

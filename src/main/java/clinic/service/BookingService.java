@@ -4,6 +4,8 @@ import clinic.dto.AppointmentDto;
 import clinic.dto.SlotRecord;
 import clinic.repository.BookingRepository;
 import clinic.security.AccountPrincipal;
+import clinic.notification.NotificationOutbox;
+import clinic.notification.NotificationRequest.Type;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -17,7 +19,10 @@ import java.util.List;
 @Transactional(readOnly = true)
 public class BookingService {
     private final BookingRepository repository;
-    public BookingService(BookingRepository repository) { this.repository = repository; }
+    private final NotificationOutbox notifications;
+    public BookingService(BookingRepository repository, NotificationOutbox notifications) {
+        this.repository = repository; this.notifications = notifications;
+    }
     private void role(AccountPrincipal actor, String role) {
         if (actor == null || !role.equals(actor.role())) throw new ResponseStatusException(HttpStatus.FORBIDDEN, "This action is not allowed");
     }
@@ -55,6 +60,7 @@ public class BookingService {
         if (repository.claim(slot.id(), slot.version()) != 1) throw conflict("Someone else changed this slot. Choose another appointment");
         try {
             long id = repository.insertAppointment(actor.id(), slot);
+            notifications.enqueue(actor.getUsername(), Type.BOOKING_CONFIRMED, id);
             return repository.appointment(id).orElseThrow();
         } catch (DataIntegrityViolationException e) {
             // Throwing a runtime exception rolls back the slot claim as well.
@@ -69,6 +75,7 @@ public class BookingService {
         if (!appointment.startsAt().isAfter(LocalDateTime.now())) throw conflict("Cannot cancel an appointment that has started");
         if (repository.cancel(id, actor.id()) != 1) throw conflict("Appointment was already changed");
         if (repository.release(appointment.availabilitySlotId()) != 1) throw conflict("Slot was already changed");
+        notifications.enqueue(actor.getUsername(), Type.BOOKING_CANCELLED, id);
     }
 
     @Transactional(isolation = Isolation.READ_COMMITTED)
