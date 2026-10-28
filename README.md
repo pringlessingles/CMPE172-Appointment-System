@@ -6,13 +6,29 @@ Spring Boot with Thymeleaf pages, Spring Security session login, and plain JDBC 
 
 ## Run on Windows
 
-Install a JDK (Java 17 or newer). In PowerShell, from this folder:
+Use **JDK 21** (not Java 17 or 25), and set `JAVA_HOME` to the JDK 21 folder. Maven checks this requirement. Normal application runs now require persistent **PostgreSQL**; H2 is confined to automated tests.
+
+The simplest supported startup uses Docker Desktop with Linux containers:
 
 ```powershell
+Copy-Item .env.example .env
+# Replace BOTH placeholders in .env. Do not overwrite an existing .env.
+docker compose up --build -d --wait
+```
+
+Open [http://localhost:8080](http://localhost:8080). Stop an old application listening on port 8080 before starting the containers. On another computer, copy your local settings separately; `.env` and database contents are not part of a Git clone.
+
+If PostgreSQL is already installed locally, create an empty `appointments` database and an account allowed to create the schema and `btree_gist` extension. Set the connection values in the same PowerShell session before starting:
+
+```powershell
+$env:DB_URL = 'jdbc:postgresql://localhost:5432/appointments'
+$env:DB_USER = 'appointments'
+$env:DB_PASSWORD = 'your-local-database-password'
+$env:NOTIFICATION_TOKEN = 'your-local-notification-token'
 .\mvnw.cmd spring-boot:run
 ```
 
-Open [http://localhost:8080](http://localhost:8080). The wrapper downloads Maven and dependencies on its first run, so internet access is needed initially. On macOS/Linux use `./mvnw spring-boot:run`, or use an installed Maven with `mvn spring-boot:run`.
+Spring does not automatically load `.env` when you use Maven directly; Compose does. The wrapper downloads Maven/dependencies on its first run. On macOS/Linux use `bash mvnw spring-boot:run` with the equivalent environment variables.
 
 ## Demo accounts
 
@@ -27,7 +43,7 @@ All demo accounts use password `Appointment123!`.
 
 Passwords in `seed.sql` are BCrypt hashes. Roles come from the database, not the submitted booking form. The seeded ADMIN account has no administrative UI in this milestone.
 
-**Local demo database:** The command above still uses in-memory H2, so its sample data resets every startup. The Docker deployment below uses persistent PostgreSQL and Flyway migrations instead. This is a coursework demo, not a system for real patient information. The H2 console is disabled.
+**Persistent database:** Both normal Maven startup and Compose use PostgreSQL without resetting existing records. Old in-memory H2 demo sessions are not automatically transferred into PostgreSQL. This is a coursework demo, not a system for real patient information. H2 and its resetting schema/seed scripts are used only in tests, never in the packaged runtime.
 
 ## Milestone 3 Docker deployment
 
@@ -43,7 +59,15 @@ Open http://localhost:8080. Check health with `curl.exe http://localhost:8080/he
 
 Stop with `docker compose down`. The named `appointment-data` volume keeps the database after stopping/recreating containers. Do not use `down -v` unless you intend to delete the stored database. Never commit `.env`.
 
-The `postgres` Spring profile disables the resetting H2 scripts. Flyway applies `db/migration/V1__appointment_system.sql` and `V2__demo_accounts_and_slots.sql` once and validates them on subsequent starts. Existing appointments, notification receipts, and queued events remain. Initial demo slots eventually become past appointments; doctors can create new slots. This does not copy an old in-memory H2 session into PostgreSQL.
+PostgreSQL is the default, and the `postgres` profile remains available for Compose/explicit configuration. Flyway applies `V1__appointment_system.sql`, `V2__demo_accounts_and_slots.sql`, and `V3__prevent_doctor_schedule_overlaps.sql` once and validates them on subsequent starts. Existing appointments, notification receipts, and queued events remain. Initial demo slots eventually become past appointments; doctors can create new slots.
+
+V3 adds the PostgreSQL `btree_gist` extension and an exclusion constraint. The migration deliberately fails if existing active slots overlap; it does not delete or rewrite those appointments. Review and resolve any old scheduling conflicts explicitly before retrying. Your database migration account must be allowed to install this extension.
+
+### Doctor schedule overlap protection
+
+Sessions for the same doctor cannot overlap, including different services. For example, 09:00-09:30 conflicts with 09:15-09:45, but 09:30-10:00 is allowed immediately afterward. Different doctors may work at the same time. BLOCKED slots do not reserve time, while AVAILABLE and BOOKED slots do.
+
+`BookingService` locks the doctor's provider row before changing the schedule. While holding that lock, it checks `existing.starts_at < requested.end AND existing.ends_at > requested.start`. Concurrent requests for one doctor are serialized; different doctors do not share that lock. Booking also checks for overlapping booked legacy slots, and the original slot-version check still protects stale requests. PostgreSQL independently enforces active-slot non-overlap with a half-open timestamp-range exclusion constraint, including writes that bypass the service.
 
 The containers bind the website to localhost and use demonstration accounts. Before any public deployment, replace demo credentials, use HTTPS, configure secure session cookies, and review retention and access policies. No cloud deployment, real messages, or paid service is required for this milestone.
 
@@ -109,7 +133,7 @@ Exactly one changed row means the claim succeeded. Zero means stale/unavailable 
 
 The database adds a second guard: `uq_appointments_slot` is unique on generated `active_slot_id`, which equals `availability_slot_id` only while the appointment is BOOKED. Cancelled/completed history has NULL there. A permanent UNIQUE on `availability_slot_id` would prevent rebooking even after cancellation, so the active-only constraint preserves history and still prevents two active bookings. Composite foreign keys ensure a slot's doctor and service match the appointment.
 
-There is no automatic retry for a booking conflict: the patient must choose again after refreshing availability. Retrying stale intent automatically could book a slot after someone cancelled it. READ_COMMITTED plus the conditional write and unique constraint protects this specific race; it does not make every query serializable. H2 in-memory commits are not durable across application restarts.
+There is no automatic retry for a booking conflict: the patient must choose again after refreshing availability. Retrying stale intent automatically could book a slot after someone cancelled it. READ_COMMITTED, per-doctor row locking, conditional version updates, and database constraints protect scheduling operations; this does not make every query serializable. Normal application commits are stored in PostgreSQL and survive application/database restarts when its volume is retained.
 
 ## Layers and core files
 
@@ -148,9 +172,25 @@ Tests cover filtering, BCrypt/session login, role and ownership checks, CSRF, br
 
 Milestone 3 adds an actual unavailable-HTTP-service booking test, timeout and HTTP 503 fallback tests, queued-event recovery, after-commit visibility, cancellation notifications, no notification on rollback, receiver idempotency, internal-token checks, metrics permissions, and database-health failure tests. Most tests use H2 and need no Docker. Outbound notification delivery is disabled by default in tests except the explicit notification integration tests.
 
-`PostgresPersistenceTest` runs only when `PG_TEST_URL` points to a **disposable test database**; it creates booking data and checks PostgreSQL migrations/cancellation/rebooking. Supply `DB_PASSWORD` and `NOTIFICATION_TOKEN` as environment variables too. It is skipped without that database, not counted as locally verified PostgreSQL coverage. Do not point it at an existing personal/deployed database.
+`PostgresPersistenceTest` uses `PG_TEST_URL` when supplied, otherwise it launches a disposable native PostgreSQL process through a test-only dependency. PostgreSQL tests are no longer silently skipped on a machine without Docker. The first test run downloads native database binaries from Maven Central. Windows may require the Visual C++ runtime identified by the embedded PostgreSQL library if `initdb` cannot start. These binaries are not packaged into the application.
 
-`.github/workflows/build.yml` runs on pushes and pull requests: Java 17/Maven verification with a disposable PostgreSQL service, then a Docker Compose build/start and health check. It stops the containers afterward. The workflow only runs on GitHub after you push the changes; no deployment or push is performed by running tests locally.
+`PostgresRestartTest` books an appointment, adds an account, closes the app and database, then reopens both using the same test-only data directory. It verifies that the booking, account, queued notification, and migration history survived. Scheduling tests cover partial/contained overlaps, adjacent sessions, different doctors, concurrent requests, and direct database constraint violations.
+
+Never point `PG_TEST_URL` at personal/deployed data: tests clear and create records in that database. Use only a disposable test database. Without `PG_TEST_URL`, all native PostgreSQL data is test-owned and removed during test cleanup.
+
+`.github/workflows/build.yml` runs on pushes and pull requests: Java 21/Maven verification with a disposable PostgreSQL service, then a Docker Compose build/start and health check. It stops the containers afterward. The workflow only runs on GitHub after you push the changes; no deployment or push is performed by running tests locally.
+
+## Milestone history tags
+
+Annotated tags preserve the original milestone snapshots without rewriting history:
+
+| Tag | Commit | Snapshot |
+| --- | --- | --- |
+| `milestone-1` | `0d72a40` | Original Milestone 1 state before professor feedback |
+| `milestone-2` | `3849e02` | Booking, security, and initial concurrency work |
+| `milestone-3` | `f337b94` | Notification, monitoring, and deployment work before feedback corrections |
+
+The Java 21, persistent-default database, and full overlap corrections are later work. The historical tags do not claim those earlier submissions already met the corrected requirements. Tags must be pushed separately when publishing; creating them locally does not upload anything.
 
 Implementation references: [Spring transaction-bound events](https://docs.spring.io/spring-framework/reference/data-access/transaction/event.html) and [after-completion resource semantics](https://docs.spring.io/spring-framework/docs/6.1.x/javadoc-api/org/springframework/transaction/event/TransactionalEventListener.html).
 

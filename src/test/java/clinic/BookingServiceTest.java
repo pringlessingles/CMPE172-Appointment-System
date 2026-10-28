@@ -37,6 +37,15 @@ class BookingServiceTest {
         assertEquals(409, assertThrows(ResponseStatusException.class, () -> service.book(patient, 1, 1)).getStatusCode().value());
         verify(repo, never()).insertAppointment(anyLong(), any());
     }
+    @Test void overlappingBookingIsRejectedBeforeClaim() {
+        SlotRecord selected = slot("AVAILABLE");
+        when(repo.slot(1)).thenReturn(Optional.of(selected));
+        when(repo.overlappingBooking(selected)).thenReturn(true);
+        assertEquals(409, assertThrows(ResponseStatusException.class,
+                () -> service.book(patient, 1, 1)).getStatusCode().value());
+        verify(repo).lockProvider(1);
+        verify(repo, never()).claim(anyLong(), anyLong());
+    }
     @Test void onlyOwnerCanCancel() {
         when(repo.appointment(9)).thenReturn(Optional.of(new AppointmentDto(9, 5, 1, 1, 1, "Other patient", "Doctor", "Consultation", start, start.plusMinutes(30), "BOOKED")));
         assertEquals(403, assertThrows(ResponseStatusException.class, () -> service.cancel(patient, 9)).getStatusCode().value());

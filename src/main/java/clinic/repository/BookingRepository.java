@@ -59,6 +59,27 @@ public class BookingRepository {
         return jdbc.queryForObject("SELECT COUNT(*) FROM services WHERE id = :s AND provider_id = :p AND active = TRUE",
                 Map.of("s", serviceId, "p", providerId), Integer.class) == 1;
     }
+    // Serialize schedule changes per doctor, not globally, for concurrent requests.
+    public void lockProvider(long providerId) {
+        jdbc.queryForObject("SELECT id FROM providers WHERE id = :id FOR UPDATE",
+                Map.of("id", providerId), Long.class);
+    }
+    public boolean overlappingSlot(long providerId, LocalDateTime start, LocalDateTime end) {
+        return jdbc.queryForObject("""
+                SELECT COUNT(*) FROM availability_slots
+                WHERE provider_id = :p AND status IN ('AVAILABLE', 'BOOKED')
+                  AND starts_at < :end AND ends_at > :start
+                """, Map.of("p", providerId, "start", start, "end", end), Integer.class) > 0;
+    }
+    public boolean overlappingBooking(SlotRecord slot) {
+        return jdbc.queryForObject("""
+                SELECT COUNT(*) FROM appointments a
+                JOIN availability_slots s ON s.id = a.availability_slot_id
+                WHERE a.provider_id = :p AND a.status = 'BOOKED' AND s.id <> :id
+                  AND s.starts_at < :end AND s.ends_at > :start
+                """, Map.of("p", slot.providerId(), "id", slot.id(),
+                        "start", slot.startsAt(), "end", slot.endsAt()), Integer.class) > 0;
+    }
     public int claim(long id, long version) {
         return jdbc.update("""
             UPDATE availability_slots SET status = 'BOOKED', version = version + 1

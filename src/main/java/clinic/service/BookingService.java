@@ -55,6 +55,8 @@ public class BookingService {
         if (!slot.providerActive() || !slot.serviceActive()) throw conflict("Doctor or service is unavailable");
         if (!slot.startsAt().isAfter(LocalDateTime.now())) throw new IllegalArgumentException("Cannot book a past appointment");
         if (!"AVAILABLE".equals(slot.status())) throw conflict("This slot has already been booked or removed");
+        repository.lockProvider(slot.providerId());
+        if (repository.overlappingBooking(slot)) throw conflict("This doctor already has an overlapping appointment");
         // The version predicate makes the update an atomic compare-and-set.
         // A stale reader loses even if a slot was booked then cancelled in between.
         if (repository.claim(slot.id(), slot.version()) != 1) throw conflict("Someone else changed this slot. Choose another appointment");
@@ -71,6 +73,7 @@ public class BookingService {
     @Transactional(isolation = Isolation.READ_COMMITTED)
     public void cancel(AccountPrincipal actor, long id) {
         AppointmentDto appointment = ownedAppointment(actor, id);
+        repository.lockProvider(appointment.providerId());
         if (!"BOOKED".equals(appointment.status())) throw conflict("Only booked appointments can be cancelled");
         if (!appointment.startsAt().isAfter(LocalDateTime.now())) throw conflict("Cannot cancel an appointment that has started");
         if (repository.cancel(id, actor.id()) != 1) throw conflict("Appointment was already changed");
@@ -84,13 +87,17 @@ public class BookingService {
         if (start == null || end == null || !end.isAfter(start) || !start.isAfter(LocalDateTime.now()))
             throw new IllegalArgumentException("Choose a future start time and an end time after it");
         if (!repository.serviceBelongsTo(serviceId, doctorId)) throw new IllegalArgumentException("Choose one of your active services");
+        repository.lockProvider(doctorId);
+        if (repository.overlappingSlot(doctorId, start, end))
+            throw conflict("This time overlaps another session for this doctor");
         try { return repository.createSlot(doctorId, serviceId, start, end); }
-        catch (DataIntegrityViolationException e) { throw conflict("A slot already exists at that start time"); }
+        catch (DataIntegrityViolationException e) { throw conflict("This time conflicts with the doctor's schedule"); }
     }
 
     @Transactional(isolation = Isolation.READ_COMMITTED)
     public void removeSlot(AccountPrincipal actor, long id) {
         long doctorId = doctorId(actor);
+        repository.lockProvider(doctorId);
         SlotRecord slot = slot(id);
         if (slot.providerId() != doctorId) throw new ResponseStatusException(HttpStatus.FORBIDDEN, "This slot belongs to another doctor");
         if (repository.block(id, doctorId, slot.version()) != 1) throw conflict("Only available, unchanged slots can be removed");
