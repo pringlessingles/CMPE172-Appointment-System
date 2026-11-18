@@ -13,7 +13,7 @@ import org.springframework.ai.tool.execution.ToolExecutionExceptionProcessor;
 import com.google.genai.Client;
 import com.google.genai.types.HttpOptions;
 import com.google.genai.types.HttpRetryOptions;
-import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.env.Environment;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -33,7 +33,8 @@ public class AiConfiguration {
 
     @Bean(destroyMethod = "close")
     @ConditionalOnProperty(name = "clinic.ai.enabled", havingValue = "true")
-    Client geminiClient(@Value("${spring.ai.google.genai.api-key}") String key) {
+    Client geminiClient(Environment environment) {
+        String key = environment.getRequiredProperty("spring.ai.google.genai.api-key");
         if (key.isBlank()) throw new IllegalArgumentException("Set GEMINI_API_KEY before enabling the ai profile");
         return Client.builder().apiKey(key).vertexAI(false).httpOptions(HttpOptions.builder()
                 .timeout(30000).retryOptions(HttpRetryOptions.builder().attempts(1).build()).build()).build();
@@ -41,8 +42,9 @@ public class AiConfiguration {
 
     @Bean
     @ConditionalOnProperty(name = "clinic.ai.enabled", havingValue = "true")
-    EmbeddingModel policyEmbeddingModel(Client client, @Value("${spring.ai.google.genai.api-key}") String key,
-            @Value("${spring.ai.google.genai.embedding.text.options.model:gemini-embedding-001}") String model) {
+    EmbeddingModel policyEmbeddingModel(Client client, Environment environment) {
+        String key = environment.getRequiredProperty("spring.ai.google.genai.api-key");
+        String model = environment.getProperty("spring.ai.google.genai.embedding.text.options.model", "gemini-embedding-001");
         var connection = GoogleGenAiEmbeddingConnectionDetails.builder().apiKey(key).genAiClient(client).build();
         var options = GoogleGenAiTextEmbeddingOptions.builder().model(model)
                 .taskType(GoogleGenAiTextEmbeddingOptions.TaskType.SEMANTIC_SIMILARITY).build();

@@ -21,6 +21,7 @@ class AiProfileTest {
     @Autowired ApplicationContext context;
     @Test void apiKeyOnlyProfileStartsWithRealChatAndEmbeddingModels() {
         assertEquals(1, context.getBeansOfType(Client.class).size());
+        assertEquals("offline-test-placeholder", context.getBean(Client.class).apiKey());
         assertEquals(1, context.getBeansOfType(ChatModel.class).size());
         assertEquals(1, context.getBeansOfType(EmbeddingModel.class).size());
         assertNotNull(context.getBean(SimpleVectorStore.class));
