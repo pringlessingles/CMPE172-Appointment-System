@@ -22,6 +22,8 @@ public class PageController {
     public String home(Model model) { model.addAttribute("home", clinic.getHome()); return "home"; }
     @GetMapping("/login")
     public String login() { return "login"; }
+    @GetMapping("/assistant")
+    public String assistant() { return "assistant"; }
     @GetMapping("/available")
     public String available(@RequestParam(required = false) Long providerId, @RequestParam(required = false) Long serviceId,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,

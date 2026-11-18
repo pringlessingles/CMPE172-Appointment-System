@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments :: head('Scheduling assistant')}"></head>
+<body>
+<nav th:replace="~{fragments :: nav}"></nav>
+<main class="narrow">
+    <h1>Scheduling assistant</h1>
+    <p>Find appointments, review your bookings, or ask about clinic policies. Use synthetic information only.</p>
+    <p>Try: “Find the earliest appointment this week” or “Can I cancel after my appointment starts?”</p>
+    <p>Bookings and cancellations require you to review the details and press Confirm. A proposal does not reserve time.</p>
+    <div id="transcript" class="card" role="log" aria-live="polite" aria-label="Conversation"></div>
+    <p id="assistant-status" role="status"></p>
+    <section id="proposal" class="notice" hidden aria-label="Review appointment change">
+        <h2>Review before confirming</h2>
+        <p id="proposal-summary"></p>
+        <p id="proposal-expiry"></p>
+        <button id="confirm-action" type="button">Confirm</button>
+        <button id="discard-action" class="secondary" type="button">Discard</button>
+    </section>
+    <form id="chat-form" class="card stack" th:action="@{/api/ai/chat}" method="post">
+        <label for="chat-message">Message</label>
+        <textarea id="chat-message" name="message" maxlength="4000" rows="3" required></textarea>
+        <button id="send-message" type="submit">Send</button>
+        <button id="new-conversation" class="secondary" type="button">New conversation</button>
+    </form>
+    <form id="restore-form" class="stack">
+        <label for="conversation-id">Resume a saved conversation using its ID</label>
+        <input id="conversation-id" maxlength="36" placeholder="Conversation ID">
+        <button type="submit" class="secondary">Resume</button>
+    </form>
+    <p id="current-conversation"></p>
+</main>
+<footer th:replace="~{fragments :: footer}"></footer>
+<script th:src="@{/js/assistant.js}" defer></script>
+</body>
+</html>

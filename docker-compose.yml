@@ -18,11 +18,14 @@ services:
     ports:
       - "127.0.0.1:8080:8080"
     environment:
-      SPRING_PROFILES_ACTIVE: postgres
+      SPRING_PROFILES_ACTIVE: ${APP_PROFILES:-postgres}
       DB_URL: jdbc:postgresql://db:5432/appointments
       DB_USER: appointments
       DB_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD in .env}
       NOTIFICATION_TOKEN: ${NOTIFICATION_TOKEN:?Set NOTIFICATION_TOKEN in .env}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      GEMINI_MODEL: ${GEMINI_MODEL:-gemini-4-hydrogen}
+      GEMINI_EMBEDDING_MODEL: ${GEMINI_EMBEDDING_MODEL:-gemini-embedding-001}
     depends_on:
       db:
         condition: service_healthy

@@ -18,8 +18,11 @@ public class BookingNotificationListener {
     }
     @TransactionalEventListener
     public void afterCommit(NotificationQueued event) {
-        boolean booked = event.type() == NotificationRequest.Type.BOOKING_CONFIRMED;
-        metrics.counter(booked ? "appointments.booked" : "appointments.cancelled").increment();
+        switch (event.type()) {
+            case BOOKING_CONFIRMED -> metrics.counter("appointments.booked").increment();
+            case BOOKING_CANCELLED -> metrics.counter("appointments.cancelled").increment();
+            case APPOINTMENT_REMINDER -> metrics.counter("ai.reminders.queued").increment();
+        }
         log.info("appointment_committed appointmentId={} action={} eventId={}",
                 event.appointmentId(), event.type(), event.eventId());
         dispatcher.deliver(event.eventId());

@@ -10,5 +10,5 @@ import java.util.UUID;
 public record NotificationRequest(@NotNull UUID eventId,
         @NotBlank @Email @Size(max = 255) String recipient,
         @NotNull Type type, @NotBlank @Size(max = 1000) String message) {
-    public enum Type { BOOKING_CONFIRMED, BOOKING_CANCELLED }
+    public enum Type { BOOKING_CONFIRMED, BOOKING_CANCELLED, APPOINTMENT_REMINDER }
 }

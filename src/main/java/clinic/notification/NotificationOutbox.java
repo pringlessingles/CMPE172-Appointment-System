@@ -18,12 +18,16 @@ public class NotificationOutbox {
     }
     // Called inside the booking/cancellation transaction: rollback removes this row too.
     public void enqueue(String recipient, NotificationRequest.Type type, long appointmentId) {
-        String id = UUID.randomUUID().toString();
         String message = "Appointment " + appointmentId +
                 (type == NotificationRequest.Type.BOOKING_CONFIRMED ? " is confirmed." : " is cancelled.");
+        enqueueMessage(recipient, type, appointmentId, message);
+    }
+    public String enqueueMessage(String recipient, NotificationRequest.Type type, long appointmentId, String message) {
+        String id = UUID.randomUUID().toString();
         jdbc.update("INSERT INTO notification_outbox(event_id, recipient, type, message) VALUES (?, ?, ?, ?)",
                 id, recipient, type.name(), message);
         events.publishEvent(new NotificationQueued(id, type, appointmentId));
+        return id;
     }
     public Optional<NotificationRequest> pending(String id) {
         return jdbc.query("SELECT * FROM notification_outbox WHERE event_id = ? AND delivered_at IS NULL",

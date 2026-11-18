@@ -1,8 +1,84 @@
 # Doctor Appointment System
 
-CMPE 172 Milestones 1 through 3 project by Newton Tran.
+CMPE 172 Milestones 1 through 4 project by Newton Tran.
 
 Spring Boot with Thymeleaf pages, Spring Security session login, and plain JDBC SQL. No JPA or Hibernate. Patients browse, book, and cancel appointments; doctors manage their availability and view their appointments.
+
+## Milestone 4: enterprise AI
+
+Java 21, Spring Boot 3.5.8 and Spring AI 1.1.8. The Boot upgrade follows the [Spring AI 1.1 compatibility line](https://github.com/spring-projects/spring-ai/tree/1.1.x). Normal appointment pages, notifications, migrations and health checks work with AI disabled and no key.
+
+To enable AI in Docker, edit your existing **uncommitted** `.env` (copy `.env.example` only if `.env` does not exist):
+
+```dotenv
+APP_PROFILES=postgres,ai
+GEMINI_API_KEY=your-google-ai-studio-key
+GEMINI_MODEL=gemini-4-hydrogen
+GEMINI_EMBEDDING_MODEL=gemini-embedding-001
+```
+
+Keep the database password and notification token configured, then run `docker compose up --build -d --wait`. Log in as a patient and open [the assistant](http://localhost:8080/assistant), also linked in the footer. The default is the current [Gemini 4 Hydrogen model](https://aistudio.google.com/docs/models/gemini-4-hydrogen); override `GEMINI_MODEL` with a function-calling model available to your account. Model availability and free quotas can change. Configuration uses the [Gemini Developer API key](https://docs.spring.io/spring-ai/reference/1.1/api/chat/google-genai-chat.html), with no Vertex project ID or location. Never commit a key.
+
+For a local Maven run, configure PostgreSQL as described below, then:
+
+```powershell
+$env:GEMINI_API_KEY = 'your-google-ai-studio-key'
+$env:SPRING_PROFILES_ACTIVE = 'ai'
+.\mvnw.cmd spring-boot:run
+```
+
+Appointment timestamps use the server's local time zone (UTC in the default Docker images). Keep the application and database time zones consistent, and retain the same interpretation used when existing slots were created.
+
+### Conversational agent and confirmation
+
+`AiAssistant` uses Spring AI `ChatClient`; Gemini chooses tools and Spring AI executes multi-step calls. `AppointmentTools` exposes the live catalog, paginated availability, the current patient's appointments, booking/cancellation proposals, and semantic policy search. Try “Find the earliest appointment this week and book it.” The assistant can clarify ambiguous requests and find alternatives. Each turn allows up to twelve tool calls; longer searches may need another turn.
+
+Tools bind to the logged-in `AccountPrincipal`; the model cannot supply a user ID or confirmation flag. `bookAppointment` and `cancelAppointment` prepare ten-minute proposals with database-sourced doctor, service, times and slot version. They cannot commit writes. The page displays that exact summary and a separate **Confirm** button. Saying “yes” in chat does not perform a write. New turns and Discard invalidate earlier proposals. Proposals do not reserve time.
+
+`AiActionService.confirm()` locks the conversation and provider, checks ownership, expiry and slot version, then calls the existing proxied transactional `BookingService`. Consuming the proposal, storing confirmation messages and booking/cancellation/outbox changes share one transaction. Failures roll everything back. Stale, expired, foreign and replayed confirmations fail. All assistant mutations retain session login, patient-role checks and CSRF protection. Concurrent agent confirmations still allow only one active booking.
+
+**Bonus: persistent conversation memory.** PostgreSQL stores conversation ownership, messages and pending proposals. The model receives the most recent twenty messages. Copy the conversation ID shown on the page and use Resume after another login or an application/database restart. Another account cannot read it. This coursework demo uses synthetic scheduling data and has no history-retention UI.
+
+### Autonomous reminder agent
+
+`ReminderAgent.scheduledRun()` runs without a prompt, first after one minute and then hourly. It scans up to twenty booked appointments starting within 24 hours. Gemini generates a short greeting using only the first name. `ReminderStore` appends verified appointment/doctor/time facts and transactionally queues `APPOINTMENT_REMINDER` in the existing notification outbox. The receiver is still a mock; no real email or SMS is sent.
+
+The `ai_reminders` appointment primary key, atomic five-minute claim, and transactional status/outbox insert prevent duplicate queued reminders across concurrent runs and restarts. Failed generation or a crashed worker becomes retryable after the lease expires. Booking status is checked again after generation. Cancellation after queueing can still race delivery; reminders and cancellations remain separate notifications. Existing outbox retries and durable receiver deduplication handle delivery failures. Reminder events do not increment booking/cancellation counters.
+
+For the manual demo, create/book a slot within the next 24 hours, log in as `admin@doctor.example` with the demo password, and run this in the browser console on the home page:
+
+```javascript
+fetch('/api/ai/reminders/run', {
+  method: 'POST',
+  headers: { 'X-CSRF-TOKEN': document.querySelector('input[name="_csrf"]').value }
+}).then(response => response.json()).then(console.log);
+```
+
+This ADMIN-only, CSRF-protected endpoint runs the same job and returns scanned/queued/failed counts and `enabled`. Repeating it does not regenerate an already queued reminder. If demo slots are stale, create a fresh slot in the doctor dashboard. Scheduler settings use `clinic.ai.reminders.delay-ms`, `initial-delay-ms`, `horizon-hours` and `batch-size`.
+
+### Grounded policy Q&A
+
+`src/main/resources/ai/clinic-policies.md` contains seven hand-written synthetic policy sections. `PolicyKnowledge` splits them into documents, generates Gemini embeddings, and ingests them into Spring AI `SimpleVectorStore` on first use. It retrieves the top three passages above a 0.45 similarity threshold. Chat exposes retrieval as `clinicPolicy`; dedicated Q&A returns an answer plus the actual source passages. The prompt requires source citations and abstention when evidence is insufficient; an empty retrieval returns an explicit unknown-policy answer without calling the LLM. Grounding reduces invented answers, but generated text still needs review.
+
+The permitted in-memory vector store re-ingests after restart; conversation/reminder state persists in PostgreSQL. First policy use makes embedding requests. Provider failures return sanitized HTTP 503 responses; ordinary booking stays available. Gemini HTTP requests have a 30-second SDK timeout per attempt, no SDK retries, and at most two Spring attempts. Multi-step chats/batch jobs can take longer than one provider request. Automated tests use local fakes and spend no Gemini quota. A real key is needed to verify live model access, quotas and generation quality.
+
+### AI endpoints and checks
+
+All endpoints use session login and CSRF for POST. Patient endpoints:
+
+| Method/path | Contract |
+| --- | --- |
+| `POST /api/ai/chat` | `{ "conversationId": null, "message": "Find an appointment" }`; returns ID, answer and optional pending action |
+| `GET /api/ai/conversations/{id}` | Owner's last twenty messages and pending proposal |
+| `POST /api/ai/conversations/{id}/confirm` | `{ "confirmationId": "pendingAction.id" }`; commits the exact saved proposal |
+| `POST /api/ai/conversations/{id}/discard` | Discards the pending proposal |
+| `POST /api/ai/questions` | `{ "question": "When can I cancel?" }`; returns answer and retrieved sources |
+
+`POST /api/ai/reminders/run` is ADMIN-only. ADMIN Actuator metrics include `ai.chat.completed`, `ai.requests.failed`, `ai.reminders.queued` and `ai.reminders.failed` after their events occur.
+
+Run `.\mvnw.cmd verify`. AI tests cover the real Spring AI/Gemini tool loop against a local fake HTTP server; real vector-store retrieval; API-key-only startup; multi-turn memory; confirmation; concurrent booking; insert rollback; ownership, roles, CSRF, expiry, replay, stale versions and sanitized failures; reminder retries, cancellation races and duplicate prevention. PostgreSQL tests exercise migration V4, agent confirmation and reminder deduplication. The app/database restart test verifies persistent history and pending proposals. Existing CI runs the suite without a key before Docker build/start/health checks.
+
+This work supplies milestone code and tests. The mandatory report and code-walkthrough video are separate deliverables.
 
 ## Run on Windows
 
@@ -59,7 +135,7 @@ Open http://localhost:8080. Check health with `curl.exe http://localhost:8080/he
 
 Stop with `docker compose down`. The named `appointment-data` volume keeps the database after stopping/recreating containers. Do not use `down -v` unless you intend to delete the stored database. Never commit `.env`.
 
-PostgreSQL is the default, and the `postgres` profile remains available for Compose/explicit configuration. Flyway applies `V1__appointment_system.sql`, `V2__demo_accounts_and_slots.sql`, and `V3__prevent_doctor_schedule_overlaps.sql` once and validates them on subsequent starts. Existing appointments, notification receipts, and queued events remain. Initial demo slots eventually become past appointments; doctors can create new slots.
+PostgreSQL is the default, and the `postgres` profile remains available for Compose/explicit configuration. Flyway applies `V1__appointment_system.sql`, `V2__demo_accounts_and_slots.sql`, `V3__prevent_doctor_schedule_overlaps.sql`, and `V4__enterprise_ai.sql` once and validates them on subsequent starts. Existing appointments, notification receipts, and queued events remain. Initial demo slots eventually become past appointments; doctors can create new slots.
 
 V3 adds the PostgreSQL `btree_gist` extension and an exclusion constraint. The migration deliberately fails if existing active slots overlap; it does not delete or rewrite those appointments. Review and resolve any old scheduling conflicts explicitly before retrying. Your database migration account must be allowed to install this extension.
 

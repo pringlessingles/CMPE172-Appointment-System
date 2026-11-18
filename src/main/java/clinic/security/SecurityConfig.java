@@ -32,7 +32,9 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                     .requestMatchers("/health", "/api/mock-notifications").permitAll()
                     .requestMatchers("/actuator/**").hasRole("ADMIN")
-                    .requestMatchers("/", "/login", "/available", "/css/**", "/error", "/api/home", "/api/slots", "/slots").permitAll()
+                    .requestMatchers("/api/ai/reminders/**").hasRole("ADMIN")
+                    .requestMatchers("/assistant", "/api/ai/**").hasRole("CUSTOMER")
+                    .requestMatchers("/", "/login", "/available", "/css/**", "/js/**", "/error", "/api/home", "/api/slots", "/slots").permitAll()
                     .requestMatchers("/doctor/**", "/api/doctor/**").hasRole("PROVIDER")
                     .requestMatchers("/book/**", "/confirmation/**", "/my-appointments/**", "/api/appointments/**").hasRole("CUSTOMER")
                     .anyRequest().authenticated())

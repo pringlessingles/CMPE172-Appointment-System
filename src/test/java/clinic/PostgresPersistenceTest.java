@@ -2,6 +2,9 @@ package clinic;
 
 import clinic.security.AccountPrincipal;
 import clinic.service.BookingService;
+import clinic.ai.AiConversationStore;
+import clinic.ai.AiActionService;
+import clinic.ai.ReminderStore;
 import org.flywaydb.core.Flyway;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.BeforeEach;
@@ -28,13 +31,37 @@ class PostgresPersistenceTest {
     @Autowired BookingService service;
     @Autowired UserDetailsService users;
     @Autowired Flyway flyway;
+    @Autowired AiConversationStore conversations;
+    @Autowired AiActionService actions;
+    @Autowired ReminderStore reminders;
     AccountPrincipal patient(String email) { return (AccountPrincipal) users.loadUserByUsername(email); }
     @BeforeEach void clean() {
+        jdbc.update("DELETE FROM ai_actions");
+        jdbc.update("DELETE FROM ai_messages");
+        jdbc.update("DELETE FROM ai_conversations");
+        jdbc.update("DELETE FROM ai_reminders");
         jdbc.update("DELETE FROM notification_outbox");
         jdbc.update("DELETE FROM notification_receipts");
         jdbc.update("DELETE FROM appointments");
         jdbc.update("DELETE FROM availability_slots WHERE id > 7");
         jdbc.update("UPDATE availability_slots SET status=CASE WHEN id=7 THEN 'BLOCKED' ELSE 'AVAILABLE' END, version=0");
+    }
+    @Test void aiConfirmationAndReminderDeduplicationUseRealPostgresTransactions() {
+        var owner = patient("sofia.reyes@example.com");
+        var start = LocalDateTime.now().plusHours(3).withNano(0);
+        long slot = service.createSlot(patient("maya.chen@doctor.example"), 1, start, start.plusMinutes(30));
+        String conversation = conversations.open(owner, null);
+        var action = actions.proposeBooking(owner, conversation, slot, 1);
+        assertEquals("AVAILABLE", service.slot(slot).status());
+        actions.confirm(owner, conversation, action.id());
+        assertEquals("BOOKED", service.slot(slot).status());
+        var candidate = reminders.due(24, 100).stream().filter(c -> c.startsAt().equals(start)).findFirst().orElseThrow();
+        assertTrue(reminders.claim(candidate.appointmentId()));
+        assertFalse(reminders.claim(candidate.appointmentId()));
+        assertTrue(reminders.enqueue(candidate, "Hi Sofia, we look forward to your visit."));
+        assertFalse(reminders.enqueue(candidate, "Duplicate greeting"));
+        assertEquals(1, jdbc.queryForObject("SELECT COUNT(*) FROM notification_outbox WHERE type='APPOINTMENT_REMINDER'", Integer.class));
+        assertEquals("ENQUEUED", jdbc.queryForObject("SELECT status FROM ai_reminders WHERE appointment_id=?", String.class, candidate.appointmentId()));
     }
     @Test void postgresMigrationsBookingCancellationAndRepeatMigrationKeepData() {
         var doctor = patient("maya.chen@doctor.example");
